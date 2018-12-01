@@ -8,8 +8,6 @@
 #define _GNU_SOURCE
 
 #define VIP_VERSION "0.0.1"
-// remain last 5 bits
-#define CTRL_KEY(k) ((k)&0x1f)
 typedef unsigned short win_size_t;
 typedef struct text_row TextRow;
 

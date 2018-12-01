@@ -46,6 +46,9 @@ enum EditorKey {
   PAGE_DOWN = 2005,
   PAGE_UP = 2006,
 
+  BACKSPACE = 127,
+  ENTER = 128,
+
   LEFT = 'h',
   RIGHT = 'l',
   UP = 'k',
@@ -57,6 +60,8 @@ enum EditorKey {
   NORMAL_MODE_KEY = '\x1b'
 };
 
+// remain last 5 bits
+#define CTRL_KEY(k) ((k)&0x1f)
 #define TEXT_START (editor.rownum_width + 1)
 #define CURRENT_ROW (editor.cy + editor.row_offset)
 #define MAX_ROW_OFFSET ((editor.numrows / editor.winrows) * editor.winrows)
@@ -276,6 +281,14 @@ void ed_progress_move(int key) {
 
 void ed_normal_progress(int c) {
   switch (c) {
+    case NORMAL_MODE_KEY:
+    case CTRL_KEY('l'):
+      break;
+    case BACKSPACE:
+    case CTRL_KEY('h'):  // 8 same as BACKSPACE
+    case DEL_KEY:
+      // todo
+      break;
     case INSERT_MODE_KEY:
       editor.mode = INSERT_MODE;
       break;
@@ -492,7 +505,6 @@ void ed_render_row(TextRow *row) {
   row->render = malloc(row->size + tabs * (TAB_SIZE - 1) + 1);
 
   int cnt = 0;
-  int c = 0;
   for (int i = 0; i < row->size; i++) {
     if (row->string[i] == '\t') {
       for (int j = 0; j < TAB_SIZE; j++) {
