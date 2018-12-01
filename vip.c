@@ -35,6 +35,7 @@ typedef struct editor_config {
 } Editor;
 
 enum EditorKey {
+  // virtual map key in large number
   ARROW_LEFT = 1000,
   ARROW_RIGHT = 1001,
   ARROW_UP = 1002,
@@ -45,9 +46,11 @@ enum EditorKey {
   END_KEY = 2004,
   PAGE_DOWN = 2005,
   PAGE_UP = 2006,
+  INS_KEY = 2007,
 
+  // real map key
   BACKSPACE = 127,
-  ENTER = 128,
+  ENTER = '\r',
 
   LEFT = 'h',
   RIGHT = 'l',
@@ -113,7 +116,10 @@ int ed_read_key() {
   while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
     if (nread == -1 && errno != EAGAIN) die("read");
   }
-  // read arrow key(\x1b[A, \x1b[B, \x1b[C, \x1b[D), Home, page up down, end key
+  // todo read F1 F2 ..., ignore in normal mode, show as <F1>, <F2> in insert
+  // mode
+  // read arrow key(\x1b[A, \x1b[B, \x1b[C, \x1b[D), Home, page up down,
+  // end key
   if (c == '\x1b') {
     char seq[3];
     if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
@@ -284,11 +290,17 @@ void ed_normal_progress(int c) {
     case NORMAL_MODE_KEY:
     case CTRL_KEY('l'):
       break;
+    case ENTER:
+      break;
     case BACKSPACE:
-    case CTRL_KEY('h'):  // 8 same as BACKSPACE
+    // 8 same as BACKSPACE
+    case CTRL_KEY('h'):
+      // todo
+      break;
     case DEL_KEY:
       // todo
       break;
+    case INS_KEY:
     case INSERT_MODE_KEY:
       editor.mode = INSERT_MODE;
       break;
