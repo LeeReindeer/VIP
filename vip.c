@@ -224,7 +224,7 @@ void ed_progress_move(int key) {
   // todo fix tab
   // editor.cy won't >= editor.numrows
   // if row->size == 0, text_end = rownum_width
-  int text_end = row ? TEXT_START + row->size - 1 : 0;
+  int text_end = row ? TEXT_START + row->rsize - 1 : 0;
   switch (key) {
     case LEFT:
     case ARROW_LEFT:
@@ -265,12 +265,12 @@ void ed_progress_move(int key) {
   // snap cursor to end of line or prev position
   row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
   // minus 1 only if row->size != 0,
-  text_end = row ? TEXT_START + row->size : 0;
+  text_end = row ? TEXT_START + row->rsize : 0;
   // from small line to large line, and reposition to prev
   if (editor.prev_cx < text_end) {
     editor.cx = editor.prev_cx;
   } else {  // down from a large line to a small line
-    editor.cx = row->size == 0 ? text_end : text_end - 1;
+    editor.cx = row->rsize == 0 ? text_end : text_end - 1;
   }
 }
 
