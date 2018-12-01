@@ -11,12 +11,12 @@
 
 enum EditorMode { NORMAL_MODE = 0, INSERT_MODE };
 
-typedef struct text_row {
+struct text_row {
   int size;
   int rsize;  // render size
   char *string;
   char *render;  // render tab as multiple spaces
-} TextRow;
+};
 
 typedef struct editor_config {
   struct termios origin_termios;
@@ -331,11 +331,7 @@ void ed_insert_progress(int c) {
       ed_progress_move(c);
       break;
     default:
-      if (iscntrl(c)) {
-        printf("%d\r\n", c);
-      } else {
-        printf("%d ('%c')\r\n", c, c);
-      }
+      ed_insert_char(c);
       break;
   }
 }
@@ -486,7 +482,7 @@ void ab_free(struct abuf *ab) { free(ab->b); }
 /* row ops */
 
 // renders tabs as multiple spaces
-static inline void ed_render_row(TextRow *row) {
+void ed_render_row(TextRow *row) {
   int tabs = 0;
   for (int i = 0; i < row->size; i++) {
     if (row->string[i] == '\t') tabs++;
@@ -510,7 +506,7 @@ static inline void ed_render_row(TextRow *row) {
   row->rsize = cnt;
 }
 
-static inline void ed_appand_row(char *s, size_t len) {
+void ed_appand_row(char *s, size_t len) {
   editor.row = realloc(editor.row, sizeof(TextRow) * (editor.numrows + 1));
 
   int this = editor.numrows;
@@ -524,6 +520,24 @@ static inline void ed_appand_row(char *s, size_t len) {
   ed_render_row(&editor.row[this]);
 
   editor.numrows++;
+}
+
+// insert c into pos
+void ed_row_insert(TextRow *row, int pos, int c) {
+  if (pos < 0 || pos > row->size) pos = row->size;
+  row->string = realloc(row->string, row->size + 2);
+  memmove(&row->string[pos + 1], &row->string[pos], row->size - pos + 1);
+  row->size++;
+  row->string[pos] = c;
+  ed_render_row(row);
+}
+
+/* edit ops, called from ed_progress_keyprogress() */
+
+void ed_insert_char(int c) {
+  // insert before cursor, just like vim
+  ed_row_insert(&editor.row[CURRENT_ROW], editor.cx - TEXT_START, c);
+  editor.cx++;
 }
 
 /* file I/O */

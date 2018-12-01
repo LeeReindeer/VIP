@@ -1,6 +1,8 @@
 #ifndef __VIP_H__
 #define __VIP_H__
 
+#include <stddef.h>
+
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
@@ -9,6 +11,7 @@
 // remain last 5 bits
 #define CTRL_KEY(k) ((k)&0x1f)
 typedef unsigned short win_size_t;
+typedef struct text_row TextRow;
 
 /* append buffer */
 struct abuf {
@@ -46,7 +49,12 @@ inline void ed_clear();
 inline void ed_refresh();
 
 /* row ops */
-// inline void ed_appand_row(char *s, size_t len);
+inline void ed_render_row(TextRow *row);
+inline void ed_appand_row(char *s, size_t len);
+inline void ed_row_insert(TextRow *row, int pos, int c);
+
+/* edit ops */
+inline void ed_insert_char(int c);
 
 /* file I/O */
 void ed_open(const char *filename);
