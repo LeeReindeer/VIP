@@ -4,12 +4,15 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>  // for winsize
 #include <termios.h>
 #include <unistd.h>
 
 #define CTRL_KEY(k) ((k)&0x1f)
 typedef struct editor_config {
   struct termios origin_termios;
+  win_size_t winrows;
+  win_size_t wincols;
 } Editor;
 
 static Editor editor;
@@ -62,6 +65,21 @@ char ed_read_key() {
   return c;
 }
 
+/**
+ * @brief get win rows and cols
+ * @retval return -1 when failed, return 0 when successd
+ */
+int get_winsize(win_size_t *rows, win_size_t *cols) {
+  struct winsize ws;
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+    return -1;
+  } else {
+    *rows = ws.ws_row;
+    *cols = ws.ws_col;
+    return 0;
+  }
+}
+
 /* input */
 
 void ed_process_keypress() {
@@ -99,8 +117,16 @@ void ed_refresh() {
   write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
-int main(int argc, char const *argv[]) {
+/* init */
+
+void init_editor() {
   enable_raw_mode();
+
+  if (get_winsize(&editor.winrows, &editor.wincols) == -1) die("get_winsize");
+}
+
+int main(int argc, char const *argv[]) {
+  init_editor();
 
   while (1) {
     ed_refresh();
