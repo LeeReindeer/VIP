@@ -6,5 +6,6 @@
 - [ ] 2. Raw input and output
 - [ ] 3. A text viewer
 - [ ] 4. A text editor
-- [ ] 5. Search
-- [ ] 6. Syntax highlighting
+- [ ] 5. Vi operations
+- [ ] 6. Search
+- [ ] 7. Syntax highlighting
