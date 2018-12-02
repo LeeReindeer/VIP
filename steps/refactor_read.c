@@ -1,4 +1,3 @@
-#include "vip.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -8,6 +7,7 @@
 #include <unistd.h>
 
 #define CTRL_KEY(k) ((k)&0x1f)
+
 typedef struct editor_config {
   struct termios origin_termios;
 } Editor;
@@ -44,13 +44,12 @@ void enable_raw_mode() {
   raw.c_oflag &= ~(OPOST);
   raw.c_cc[VMIN] = 0;
   // read timeout at 200 ms
-  // if don't set screen will not refresh until key press
   raw.c_cc[VTIME] = 2;
   // set back attr
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
-char ed_read_key() {
+char ed_read_Key() {
   int nread;
   char c;
   // read() has a timeout, so it loop read util a key press
@@ -61,10 +60,18 @@ char ed_read_key() {
   return c;
 }
 
+int println(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+  return printf("\r\n");
+}
+
 /* input */
 
 void ed_process_keypress() {
-  char c = ed_read_key();
+  char c = ed_read_Key();
   switch (c) {
     case CTRL_KEY('q'):
       exit(0);
@@ -79,21 +86,10 @@ void ed_process_keypress() {
   }
 }
 
-/* output */
-int println(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
-  return printf("\r\n");
-}
-
 int main(int argc, char const *argv[]) {
   enable_raw_mode();
-
   while (1) {
     ed_process_keypress();
   }
-
   return 0;
 }
