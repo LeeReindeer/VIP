@@ -72,12 +72,38 @@ char ed_read_key() {
 int get_winsize(win_size_t *rows, win_size_t *cols) {
   struct winsize ws;
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    return -1;
+    // move cursor to right 999 and move down to 999
+    // The C and B commands are specifically documented
+    // to stop the cursor from going past the edge of the screen.
+    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+    return get_cursor_pos(rows, cols);
   } else {
     *rows = ws.ws_row;
     *cols = ws.ws_col;
     return 0;
   }
+}
+
+/**
+ * @brief send \x1b[6n to get cursor reply like \x1b[24;80R,
+ * then parse the reply.
+ */
+int get_cursor_pos(win_size_t *rows, win_size_t *cols) {
+  if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+
+  char buf[32];
+  unsigned int i = 0;
+
+  while (i < sizeof(buf) - 1) {
+    if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
+    if (buf[i] == 'R') break;
+    i++;
+  }
+  buf[i] = '\0';
+  // println("\r\n&buf[1]: '%s'", &buf[1]);
+  if (buf[0] != '\x1b' || buf[1] != '[') return -1;
+  if (sscanf(&buf[2], "%hu;%hu", rows, cols) != 2) return -1;
+  return 0;
 }
 
 /* input */

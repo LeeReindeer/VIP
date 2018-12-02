@@ -13,7 +13,7 @@ void disable_raw_mode();
 void disable_raw_mode();
 inline char ed_read_key();
 int get_winsize(win_size_t *rows, win_size_t *cols);
-
+int get_cursor_pos(win_size_t *rows, win_size_t *cols);
 /* input */
 inline void ed_process_keypress();
 
