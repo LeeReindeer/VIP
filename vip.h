@@ -26,9 +26,11 @@ void disable_raw_mode();
 inline char ed_read_key();
 int get_winsize(win_size_t *rows, win_size_t *cols);
 int get_cursor_pos(win_size_t *rows, win_size_t *cols);
+inline void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y);
 
 /* input */
 inline void ed_process_keypress();
+inline void ed_process_move(char key);
 
 /* output */
 inline int println(const char *fmt, ...);

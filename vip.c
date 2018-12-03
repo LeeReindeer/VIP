@@ -11,9 +11,10 @@
 
 #define CTRL_KEY(k) ((k)&0x1f)
 typedef struct editor_config {
-  struct termios origin_termios;
+  win_size_t cx, cy;
   win_size_t winrows;
   win_size_t wincols;
+  struct termios origin_termios;
 } Editor;
 
 static Editor editor;
@@ -107,7 +108,32 @@ int get_cursor_pos(win_size_t *rows, win_size_t *cols) {
   return 0;
 }
 
+void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y) {
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%hu;%huH", y + 1, x + 1);
+  ab_append(ab, buf, strlen(buf));
+}
+
 /* input */
+
+void ed_process_move(char key) {
+  switch (key) {
+    case 'h':
+      if (editor.cx > 0) editor.cx--;
+      break;
+    case 'l':
+      if (editor.cx < editor.wincols - 1) editor.cx++;
+      break;
+    case 'j':
+      if (editor.cy < editor.winrows - 1) editor.cy++;
+      break;
+    case 'k':
+      if (editor.cy > 0) editor.cy--;
+      break;
+    default:
+      break;
+  }
+}
 
 void ed_process_keypress() {
   char c = ed_read_key();
@@ -116,6 +142,11 @@ void ed_process_keypress() {
       ed_clear();
       exit(0);
       break;
+    case 'h':
+    case 'l':
+    case 'j':
+    case 'k':
+      ed_process_move(c);
     default:
       break;
   }
@@ -186,7 +217,8 @@ void ed_refresh() {
 
   ed_draw_rows(&ab);
 
-  ab_append(&ab, "\x1b[H", 3);
+  // move cursor to
+  ed_move_cursor2(&ab, editor.cx, editor.cy);
 
   // hide cursor
   ab_append(&ab, "\x1b[?25h", 6);
@@ -212,6 +244,8 @@ void ab_free(struct abuf *ab) { free(ab->b); }
 
 void init_editor() {
   enable_raw_mode();
+
+  editor.cx = editor.cy = 0;
 
   if (get_winsize(&editor.winrows, &editor.wincols) == -1) die("get_winsize");
 }
