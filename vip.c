@@ -213,6 +213,14 @@ void ed_process_move(int key) {
     case ARROW_UP:
       if (editor.cy > 0) editor.cy--;
       break;
+    case HOME_KEY:
+    case LINE_START:
+      editor.cx = 0;
+      break;
+    case LINE_END:
+    case END_KEY:
+      editor.cx = editor.wincols - 1;
+      break;
     default:
       break;
   }
@@ -235,6 +243,11 @@ void ed_normal_process(int c) {
     case ARROW_DOWN:
     case UP:
     case ARROW_UP:
+
+    case HOME_KEY:
+    case LINE_START:
+    case END_KEY:
+    case LINE_END:
       ed_process_move(c);
     default:
       break;
@@ -250,6 +263,9 @@ void ed_insert_process(int c) {
     case ARROW_UP:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+
+    case HOME_KEY:
+    case END_KEY:
       ed_process_move(c);
       break;
     default:
