@@ -264,17 +264,18 @@ void ed_process_move(int key) {
 
   // snap cursor to end of line or prev position
   row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
-  // minus 1 only if row->size != 0,
-  text_end = row ? TEXT_START + row->rsize : 0;
-  // from small line to large line, and reposition to prev
-  if (editor.prev_cx < text_end) {
-    editor.cx = editor.prev_cx;
-  } else {  // down from a large line to a small line
-    editor.cx = row->rsize == 0 ? text_end : text_end - 1;
+  if (row) {
+    // minus 1 only if row->size != 0,
+    text_end = row ? TEXT_START + row->rsize : 0;
+    // from small line to large line, and reposition to prev
+    if (editor.prev_cx < text_end) {
+      editor.cx = editor.prev_cx;
+    } else {  // down from a large line to a small line
+      editor.cx = row->rsize == 0 ? text_end : text_end - 1;
+    }
   }
 }
 
-// todo fix segmentation fault when no file open
 void ed_normal_process(int c) {
   switch (c) {
     case INSERT_MODE_KEY:
