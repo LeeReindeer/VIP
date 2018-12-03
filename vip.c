@@ -218,7 +218,7 @@ int println(const char *fmt, ...) {
   return printf("\r\n");
 }
 
-void ed_progress_move(int key) {
+void ed_process_move(int key) {
   TextRow *row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
   int text_start = row ? TEXT_START : 0;
   // todo fix tab
@@ -274,7 +274,8 @@ void ed_progress_move(int key) {
   }
 }
 
-void ed_normal_progress(int c) {
+// todo fix segmentation fault when no file open
+void ed_normal_process(int c) {
   switch (c) {
     case INSERT_MODE_KEY:
       editor.mode = INSERT_MODE;
@@ -312,14 +313,14 @@ void ed_normal_progress(int c) {
     case LEFT:
     case ARROW_RIGHT:
     case RIGHT:
-      ed_progress_move(c);
+      ed_process_move(c);
       break;
     default:
       break;
   }
 }
 
-void ed_insert_progress(int c) {
+void ed_insert_process(int c) {
   switch (c) {
     case NORMAL_MODE_KEY:
       editor.mode = NORMAL_MODE;
@@ -328,7 +329,7 @@ void ed_insert_progress(int c) {
     case ARROW_UP:
     case ARROW_LEFT:
     case ARROW_RIGHT:
-      ed_progress_move(c);
+      ed_process_move(c);
       break;
     default:
       if (iscntrl(c)) {
@@ -340,12 +341,12 @@ void ed_insert_progress(int c) {
   }
 }
 
-void ed_progress_keypress() {
+void ed_process_keypress() {
   int key = ed_read_key();
   if (editor.mode == INSERT_MODE) {
-    ed_insert_progress(key);
+    ed_insert_process(key);
   } else if (editor.mode == NORMAL_MODE) {
-    ed_normal_progress(key);
+    ed_normal_process(key);
   }
 }
 
@@ -496,7 +497,6 @@ static inline void ed_render_row(TextRow *row) {
   row->render = malloc(row->size + tabs * (TAB_SIZE - 1) + 1);
 
   int cnt = 0;
-  int c = 0;
   for (int i = 0; i < row->size; i++) {
     if (row->string[i] == '\t') {
       for (int j = 0; j < TAB_SIZE; j++) {
@@ -590,7 +590,7 @@ int main(int argc, char const *argv[]) {
 
   while (1) {
     ed_refresh();
-    ed_progress_keypress();
+    ed_process_keypress();
   }
 
   return 0;

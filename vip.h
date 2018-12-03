@@ -32,10 +32,10 @@ int get_winsize(win_size_t *rows, win_size_t *cols);
 int get_cursor_pos(win_size_t *rows, win_size_t *cols);
 
 /* input */
-inline void ed_progress_move(int key);
-inline void ed_normal_progress(int key);
-inline void ed_insert_progress(int key);
-inline void ed_progress_keypress();
+inline void ed_process_move(int key);
+inline void ed_normal_process(int key);
+inline void ed_insert_process(int key);
+inline void ed_process_keypress();
 
 /* output */
 inline int println(const char *fmt, ...);
