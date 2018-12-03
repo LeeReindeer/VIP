@@ -30,6 +30,8 @@ inline void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y);
 
 /* input */
 inline void ed_process_keypress();
+inline void ed_normal_process(int key);
+inline void ed_insert_process(int key);
 inline void ed_process_move(int key);
 
 /* output */

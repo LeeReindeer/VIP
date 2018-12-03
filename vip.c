@@ -10,10 +10,13 @@
 #include <unistd.h>
 
 #define CTRL_KEY(k) ((k)&0x1f)
+
+enum EditorMode { NORMAL_MODE = 0, INSERT_MODE };
 typedef struct editor_config {
   win_size_t cx, cy;
   win_size_t winrows;
   win_size_t wincols;
+  enum EditorMode mode;  // NORMAL_MODE, INSERT_MODE
   struct termios origin_termios;
 } Editor;
 
@@ -35,6 +38,9 @@ enum EditorKey {
   DOWN = 'j',
   LINE_START = '0',
   LINE_END = '$',
+
+  INSERT_MODE_KEY = 'i',
+  NORMAL_MODE_KEY = '\x1b'
 };
 
 static Editor editor;
@@ -191,19 +197,19 @@ void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y) {
 
 void ed_process_move(int key) {
   switch (key) {
-    case 'h':
+    case LEFT:
     case ARROW_LEFT:
       if (editor.cx > 0) editor.cx--;
       break;
-    case 'l':
+    case RIGHT:
     case ARROW_RIGHT:
       if (editor.cx < editor.wincols - 1) editor.cx++;
       break;
-    case 'j':
+    case DOWN:
     case ARROW_DOWN:
       if (editor.cy < editor.winrows - 1) editor.cy++;
       break;
-    case 'k':
+    case UP:
     case ARROW_UP:
       if (editor.cy > 0) editor.cy--;
       break;
@@ -212,24 +218,56 @@ void ed_process_move(int key) {
   }
 }
 
-void ed_process_keypress() {
-  int c = ed_read_key();
+void ed_normal_process(int c) {
   switch (c) {
+    case INSERT_MODE_KEY:
+      editor.mode = INSERT_MODE;
+      break;
     case CTRL_KEY('q'):
       ed_clear();
       exit(0);
       break;
-    case 'h':
+    case LEFT:
     case ARROW_LEFT:
-    case 'l':
+    case RIGHT:
     case ARROW_RIGHT:
-    case 'j':
+    case DOWN:
     case ARROW_DOWN:
-    case 'k':
+    case UP:
     case ARROW_UP:
       ed_process_move(c);
     default:
       break;
+  }
+}
+
+void ed_insert_process(int c) {
+  switch (c) {
+    case NORMAL_MODE_KEY:
+      editor.mode = NORMAL_MODE;
+      break;
+    case ARROW_DOWN:
+    case ARROW_UP:
+    case ARROW_LEFT:
+    case ARROW_RIGHT:
+      ed_process_move(c);
+      break;
+    default:
+      if (iscntrl(c)) {
+        printf("%d\r\n", c);
+      } else {
+        printf("%d ('%c')\r\n", c, c);
+      }
+      break;
+  }
+}
+
+void ed_process_keypress() {
+  int key = ed_read_key();
+  if (editor.mode == INSERT_MODE) {
+    ed_insert_process(key);
+  } else if (editor.mode == NORMAL_MODE) {
+    ed_normal_process(key);
   }
 }
 
