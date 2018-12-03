@@ -17,6 +17,26 @@ typedef struct editor_config {
   struct termios origin_termios;
 } Editor;
 
+enum EditorKey {
+  ARROW_LEFT = 1000,
+  ARROW_RIGHT = 1001,
+  ARROW_UP = 1002,
+  ARROW_DOWN = 1003,
+
+  HOME_KEY = 2001,
+  DEL_KEY = 2003,
+  END_KEY = 2004,
+  PAGE_DOWN = 2005,
+  PAGE_UP = 2006,
+
+  LEFT = 'h',
+  RIGHT = 'l',
+  UP = 'k',
+  DOWN = 'j',
+  LINE_START = '0',
+  LINE_END = '$',
+};
+
 static Editor editor;
 
 /* terminal*/
@@ -56,7 +76,7 @@ void enable_raw_mode() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
-char ed_read_key() {
+int ed_read_key() {
   int nread;
   char c;
   // read() has a timeout, so it loop read util a key press
@@ -64,7 +84,60 @@ char ed_read_key() {
   while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
     if (nread == -1 && errno != EAGAIN) die("read");
   }
-  return c;
+  // read arrow key(\x1b[A, \x1b[B, \x1b[C, \x1b[D), Home, page up down, end key
+  if (c == '\x1b') {
+    char seq[3];
+    if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+    if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+    if (seq[0] == '[') {                     // seq[0]
+      if (seq[1] >= '0' && seq[1] <= '9') {  // seq[1]
+        if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+        if (seq[2] == '~') {  // seq[2]
+          switch (seq[1]) {
+            case '1':
+              return HOME_KEY;
+            case '3':
+              return DEL_KEY;
+            case '4':
+              return END_KEY;
+            case '5':
+              return PAGE_UP;
+            case '6':
+              return PAGE_DOWN;
+            case '7':
+              return HOME_KEY;
+            case '8':
+              return END_KEY;
+          }
+        }
+      } else {  // seq[1]
+        switch (seq[1]) {
+          case 'A':
+            return ARROW_UP;
+          case 'B':
+            return ARROW_DOWN;
+          case 'C':
+            return ARROW_RIGHT;
+          case 'D':
+            return ARROW_LEFT;
+          case 'H':
+            return HOME_KEY;
+          case 'F':
+            return END_KEY;
+        }
+      }
+    } else if (seq[0] == 'O') {  // seq[0]
+      switch (seq[1]) {
+        case 'H':
+          return HOME_KEY;
+        case 'F':
+          return END_KEY;
+      }
+    }
+    return '\x1b';
+  } else {
+    return c;
+  }
 }
 
 /**
@@ -116,18 +189,22 @@ void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y) {
 
 /* input */
 
-void ed_process_move(char key) {
+void ed_process_move(int key) {
   switch (key) {
     case 'h':
+    case ARROW_LEFT:
       if (editor.cx > 0) editor.cx--;
       break;
     case 'l':
+    case ARROW_RIGHT:
       if (editor.cx < editor.wincols - 1) editor.cx++;
       break;
     case 'j':
+    case ARROW_DOWN:
       if (editor.cy < editor.winrows - 1) editor.cy++;
       break;
     case 'k':
+    case ARROW_UP:
       if (editor.cy > 0) editor.cy--;
       break;
     default:
@@ -136,16 +213,20 @@ void ed_process_move(char key) {
 }
 
 void ed_process_keypress() {
-  char c = ed_read_key();
+  int c = ed_read_key();
   switch (c) {
     case CTRL_KEY('q'):
       ed_clear();
       exit(0);
       break;
     case 'h':
+    case ARROW_LEFT:
     case 'l':
+    case ARROW_RIGHT:
     case 'j':
+    case ARROW_DOWN:
     case 'k':
+    case ARROW_UP:
       ed_process_move(c);
     default:
       break;

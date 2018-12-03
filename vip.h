@@ -23,14 +23,14 @@ inline void ab_free(struct abuf *ab);
 void die(const char *msg);
 void disable_raw_mode();
 void disable_raw_mode();
-inline char ed_read_key();
+inline int ed_read_key();
 int get_winsize(win_size_t *rows, win_size_t *cols);
 int get_cursor_pos(win_size_t *rows, win_size_t *cols);
 inline void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y);
 
 /* input */
 inline void ed_process_keypress();
-inline void ed_process_move(char key);
+inline void ed_process_move(int key);
 
 /* output */
 inline int println(const char *fmt, ...);
