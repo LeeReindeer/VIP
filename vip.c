@@ -20,9 +20,12 @@ struct text_row {
 
 typedef struct editor_config {
   struct termios origin_termios;
-  win_size_t cx, cy;   // cursor position
+  win_size_t cx, cy;  // cursor position
+  // todo
+  win_size_t rx;       // index for render tab
   win_size_t prev_cx;  // previous cursor's x coordinate
   int row_offset;  // current first line offset, MAX_ROW_OFFSET, MIN_ROW_OFFSET
+  int col_offset;
   win_size_t winrows;
   win_size_t wincols;
   enum EditorMode mode;  // NORMAL_MODE, INSERT_MODE
@@ -66,8 +69,10 @@ enum EditorKey {
 // remain last 5 bits
 #define CTRL_KEY(k) ((k)&0x1f)
 #define TEXT_START (editor.rownum_width + 1)
-#define CURRENT_ROW (editor.cy + editor.row_offset)
-#define MAX_ROW_OFFSET ((editor.numrows / editor.winrows) * editor.winrows)
+#define TEXT_MAX_LENGTH ((int)editor.wincols - TEXT_START)
+#define CURRENT_ROW ((int)editor.cy + editor.row_offset)
+#define MAX_ROW_OFFSET \
+  ((editor.numrows / (int)editor.winrows) * (int)editor.winrows)
 #define MIN_ROW_OFFSET 0
 #define TAB_SIZE 8  // todo set in setting file .viprc
 static Editor editor;
@@ -239,12 +244,21 @@ void ed_process_move(int key) {
   switch (key) {
     case LEFT:
     case ARROW_LEFT:
-      if (editor.cx != text_start) editor.cx--;
+      if (editor.col_offset > 0 && editor.cx == TEXT_START) {
+        editor.col_offset--;
+      } else if (editor.cx != text_start) {
+        editor.cx--;
+      }
       editor.prev_cx = editor.cx;
       break;
     case RIGHT:
     case ARROW_RIGHT:
-      if (editor.cx != /*editor.wincols - 1*/ text_end) editor.cx++;
+      if (editor.col_offset < row->rsize - TEXT_MAX_LENGTH &&
+          editor.cx == editor.wincols - 1) {
+        editor.col_offset++;
+      } else if (editor.cx != text_end - editor.col_offset) {
+        editor.cx++;
+      }
       editor.prev_cx = editor.cx;
       break;
     case DOWN:
@@ -278,6 +292,7 @@ void ed_process_move(int key) {
   if (row) {
     // minus 1 only if row->size != 0,
     text_end = row ? TEXT_START + row->rsize : 0;
+    if (editor.col_offset > 0) text_end -= editor.col_offset;
     // from small line to large line, and reposition to prev
     if (editor.prev_cx < text_end) {
       editor.cx = editor.prev_cx;
@@ -313,13 +328,22 @@ void ed_normal_process(int c) {
     case LINE_START:
     case HOME_KEY:
       editor.cx = editor.numrows != 0 ? TEXT_START : 0;
+      editor.prev_cx = editor.cx;
+      if (editor.col_offset > 0) {
+        editor.col_offset = 0;
+      }
       break;
     case LINE_END:
     case END_KEY:
-      // todo fix tab
-      editor.cx = editor.numrows != 0
-                      ? TEXT_START + editor.row[editor.cy].rsize - 1
-                      : 0;  // editor.wincols - 1;
+      if (editor.row[CURRENT_ROW].rsize > TEXT_MAX_LENGTH) {
+        editor.col_offset = editor.row[CURRENT_ROW].rsize - TEXT_MAX_LENGTH;
+        editor.cx = editor.numrows != 0 ? editor.wincols - 1 : 0;
+      } else {
+        editor.cx = editor.numrows != 0
+                        ? TEXT_START + editor.row[CURRENT_ROW].rsize - 1
+                        : 0;
+      }
+      editor.prev_cx = editor.cx;
       break;
     case PAGE_DOWN:
       if ((editor.row_offset += (int)editor.winrows) > editor.numrows) {
@@ -380,7 +404,7 @@ static inline int ed_toggle_case(int a) { return isalpha(a) ? a ^ 0x20 : -1; }
 
 // center a line, appand spaces in front of it
 static inline void ed_draw_center(struct abuf *ab, int line_size) {
-  int margin = (editor.wincols - line_size) / 2;
+  int margin = ((int)editor.wincols - line_size) / 2;
   while (margin--) {
     ab_append(ab, " ", 1);
   }
@@ -418,9 +442,12 @@ void ed_draw_rows(struct abuf *ab) {
                             editor.rownum_width, filerow + 1);
       ab_append(ab, linenum, numlen);
 
-      int len = editor.row[filerow].rsize;
-      if (len > editor.wincols) len = editor.wincols;
-      ab_append(ab, editor.row[filerow].render, len);
+      int len = editor.row[filerow].rsize - editor.col_offset;
+      // int len = editor.row[filerow].rsize;
+      if (len < 0) len = 0;
+      if (len > TEXT_MAX_LENGTH) len = TEXT_MAX_LENGTH;
+      ab_append(ab, editor.row[filerow].render + editor.col_offset, len);
+      // ab_append(ab, editor.row[filerow].render, len);
     }
     //  0 erases the part of the line to the right of the cursor.
     // 0 is the  default argument,
@@ -471,6 +498,12 @@ void ed_clear() {
 }
 
 void ed_refresh() {
+  // if (editor.cx < editor.col_offset) {
+  //   editor.col_offset = editor.cx;
+  // }
+  // if (editor.cx >= editor.col_offset * TEXT_MAX_LENGTH) {
+  //   editor.col_offset = editor.cx - TEXT_MAX_LENGTH + 1;
+  // }
   struct abuf ab = ABUF_INIT;
   // hide cursor
   ab_append(&ab, "\x1b[?25l", 6);
@@ -562,7 +595,8 @@ void ed_row_insert(TextRow *row, int pos, int c) {
 
 void ed_insert_char(int c) {
   // insert before cursor, just like vim
-  ed_row_insert(&editor.row[CURRENT_ROW], editor.cx - TEXT_START, c);
+  ed_row_insert(&editor.row[CURRENT_ROW],
+                editor.cx - TEXT_START + editor.col_offset, c);
   editor.cx++;
 }
 
@@ -604,10 +638,11 @@ void init_editor() {
   enable_raw_mode();
 
   editor.cx = editor.cy = 0;
+  editor.rx = 0;
   editor.mode = NORMAL_MODE;
   editor.numrows = 0;
   editor.row = NULL;
-  editor.row_offset = 0;
+  editor.row_offset = editor.col_offset = 0;
   editor.filename = NULL;
   editor.rownum_width = 0;
 
