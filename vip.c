@@ -229,7 +229,7 @@ int println(const char *fmt, ...) {
   return printf("\r\n");
 }
 
-void ed_progress_move(int key) {
+void ed_process_move(int key) {
   TextRow *row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
   int text_start = row ? TEXT_START : 0;
   // todo fix tab
@@ -249,12 +249,12 @@ void ed_progress_move(int key) {
       break;
     case DOWN:
     case ARROW_DOWN:
-      if (editor.numrows <= editor.winrows) {
+      if (editor.numrows != 0 && editor.numrows <= (int)editor.winrows) {
         if (editor.cy != editor.numrows - 1) editor.cy++;
       } else {
         if (editor.cy != editor.winrows - 1)
           editor.cy++;
-        else if (editor.row_offset < editor.numrows - editor.winrows)
+        else if (editor.row_offset < editor.numrows - (int)editor.winrows)
           editor.row_offset++;
       }
       break;
@@ -275,17 +275,19 @@ void ed_progress_move(int key) {
 
   // snap cursor to end of line or prev position
   row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
-  // minus 1 only if row->size != 0,
-  text_end = row ? TEXT_START + row->rsize : 0;
-  // from small line to large line, and reposition to prev
-  if (editor.prev_cx < text_end) {
-    editor.cx = editor.prev_cx;
-  } else {  // down from a large line to a small line
-    editor.cx = row->rsize == 0 ? text_end : text_end - 1;
+  if (row) {
+    // minus 1 only if row->size != 0,
+    text_end = row ? TEXT_START + row->rsize : 0;
+    // from small line to large line, and reposition to prev
+    if (editor.prev_cx < text_end) {
+      editor.cx = editor.prev_cx;
+    } else {  // down from a large line to a small line
+      editor.cx = row->rsize == 0 ? text_end : text_end - 1;
+    }
   }
 }
 
-void ed_normal_progress(int c) {
+void ed_normal_process(int c) {
   switch (c) {
     case NORMAL_MODE_KEY:
     case CTRL_KEY('l'):
@@ -337,14 +339,14 @@ void ed_normal_progress(int c) {
     case LEFT:
     case ARROW_RIGHT:
     case RIGHT:
-      ed_progress_move(c);
+      ed_process_move(c);
       break;
     default:
       break;
   }
 }
 
-void ed_insert_progress(int c) {
+void ed_insert_process(int c) {
   switch (c) {
     case NORMAL_MODE_KEY:
       editor.mode = NORMAL_MODE;
@@ -353,7 +355,7 @@ void ed_insert_progress(int c) {
     case ARROW_UP:
     case ARROW_LEFT:
     case ARROW_RIGHT:
-      ed_progress_move(c);
+      ed_process_move(c);
       break;
     default:
       ed_insert_char(c);
@@ -361,12 +363,12 @@ void ed_insert_progress(int c) {
   }
 }
 
-void ed_progress_keypress() {
+void ed_process_keypress() {
   int key = ed_read_key();
   if (editor.mode == INSERT_MODE) {
-    ed_insert_progress(key);
+    ed_insert_process(key);
   } else if (editor.mode == NORMAL_MODE) {
-    ed_normal_progress(key);
+    ed_normal_process(key);
   }
 }
 
@@ -628,7 +630,7 @@ int main(int argc, char const *argv[]) {
 
   while (1) {
     ed_refresh();
-    ed_progress_keypress();
+    ed_process_keypress();
   }
 
   return 0;

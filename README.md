@@ -2,9 +2,11 @@
 
 > VIP - Vi Poor
 
-- [ ] 1. Entering raw mode
-- [ ] 2. Raw input and output
+
+- [x] 1. Entering raw mode
+- [x] 2. Raw input and output
 - [x] 3. A text viewer
-- [ ] 4. A text editor
-- [ ] 5. Search
-- [ ] 6. Syntax highlighting
+- [x] 4. A text editor
+- [ ] 5. Vi operations
+- [ ] 6. Search
+- [ ] 7. Syntax highlighting
