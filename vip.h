@@ -12,13 +12,15 @@ typedef unsigned short win_size_t;
 typedef struct text_row TextRow;
 
 /* append buffer */
+#define DEFAULT_CAP 80
 struct abuf {
   char *b;
+  int cap;
   int len;
 };
 
 #define ABUF_INIT \
-  { NULL, 0 }
+  { NULL, DEFAULT_CAP, 0 }
 
 void ab_append(struct abuf *ab, const char *s, int len);
 void ab_free(struct abuf *ab);
@@ -58,6 +60,8 @@ inline void ed_insert_char(int c);
 
 /* file I/O */
 void ed_open(const char *filename);
+void ed_rows2str(int *buflem);
+void ed_save();
 
 /* init */
 inline void init_editor();

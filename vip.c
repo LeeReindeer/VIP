@@ -36,6 +36,7 @@ typedef struct editor_config {
   int rownum_width;  // line number width for printf("%*d", width, data)
 
   char *filename;  // opend file name, if argc == 1, display as [No Name]
+  char file_opened;
   char commandmsg[100];
   time_t commandmsg_time;
 } Editor;
@@ -296,6 +297,8 @@ void ed_normal_process(int c) {
       break;
     case INS_KEY:
     case INSERT_MODE_KEY:
+      // nothing in welcome screen
+      if (!editor.file_opened) return;
       editor.mode = INSERT_MODE;
       break;
     case CTRL_KEY('q'):
@@ -529,6 +532,7 @@ void ed_refresh() {
   ed_scroll();
 
   struct abuf ab = ABUF_INIT;
+  ab.b = malloc(ab.cap);
   // hide cursor
   ab_append(&ab, "\x1b[?25l", 6);
 
@@ -553,12 +557,16 @@ void ed_refresh() {
 
 /* append buf */
 void ab_append(struct abuf *ab, const char *s, int len) {
-  char *new = realloc(ab->b, ab->len + len);
+  char *buf = ab->b;
+  if (ab->len + len >= ab->cap) {
+    ab->cap = ab->cap * 2 + len;
+    buf = realloc(ab->b, ab->cap);
+    if (buf == NULL) return;
+    ab->b = buf;
+  }
 
-  if (new == NULL) return;
   // appand s at end of new
-  memcpy(&new[ab->len], s, len);
-  ab->b = new;
+  memcpy(&buf[ab->len], s, len);
   ab->len += len;
 }
 
@@ -654,6 +662,7 @@ void ed_open(const char *filename) {
 
   free(line);
   fclose(fp);
+  editor.file_opened = 1;
 }
 
 /* init */
@@ -668,6 +677,7 @@ void init_editor() {
   editor.row = NULL;
   editor.row_offset = editor.col_offset = 0;
   editor.filename = NULL;
+  editor.file_opened = 0;
   editor.rownum_width = 0;
 
   editor.commandmsg[0] = '\0';
@@ -675,7 +685,7 @@ void init_editor() {
 
   if (get_winsize(&editor.winrows, &editor.wincols) == -1) die("get_winsize");
 
-  ed_set_commandmsg("Ctrl-q = quit");
+  ed_set_commandmsg("type <CTRL-Q> to quit");
 }
 
 int main(int argc, char const *argv[]) {
@@ -693,7 +703,6 @@ int main(int argc, char const *argv[]) {
   editor.winrows -= 2;
   // first some cols display as line number
   editor.wincols -= TEXT_START;
-
   while (1) {
     ed_refresh();
     ed_process_keypress();
