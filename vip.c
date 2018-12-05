@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 enum EditorMode { NORMAL_MODE = 0, INSERT_MODE };
@@ -24,7 +25,7 @@ typedef struct editor_config {
   // todo
   win_size_t rx;       // index for render tab
   win_size_t prev_cx;  // previous cursor's x coordinate
-  int row_offset;  // current first line offset, MAX_ROW_OFFSET, MIN_ROW_OFFSET
+  int row_offset;
   int col_offset;
   win_size_t winrows;
   win_size_t wincols;
@@ -35,6 +36,8 @@ typedef struct editor_config {
   int rownum_width;  // line number width for printf("%*d", width, data)
 
   char *filename;  // opend file name, if argc == 1, display as [No Name]
+  char commandmsg[100];
+  time_t commandmsg_time;
 } Editor;
 
 enum EditorKey {
@@ -69,11 +72,8 @@ enum EditorKey {
 // remain last 5 bits
 #define CTRL_KEY(k) ((k)&0x1f)
 #define TEXT_START (editor.rownum_width + 1)
-#define TEXT_MAX_LENGTH ((int)editor.wincols - TEXT_START)
+#define WIN_MAX_LENGTH ((int)editor.wincols + TEXT_START)
 #define CURRENT_ROW ((int)editor.cy)
-#define MAX_ROW_OFFSET \
-  ((editor.numrows / (int)editor.winrows) * (int)editor.winrows)
-#define MIN_ROW_OFFSET 0
 #define TAB_SIZE 8  // todo set in setting file .viprc
 static Editor editor;
 
@@ -226,14 +226,6 @@ void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y) {
 
 /* input */
 
-int println(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vprintf(fmt, args);
-  va_end(args);
-  return printf("\r\n");
-}
-
 void ed_process_move(int key) {
   TextRow *row = editor.numrows == 0 ? NULL : &editor.row[CURRENT_ROW];
   int text_start = row ? TEXT_START : 0;
@@ -383,6 +375,14 @@ void ed_process_keypress() {
 
 /* output */
 
+int println(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+  return printf("\r\n");
+}
+
 // assume input and output are alaphabet
 // lowercase <-> uppercase
 static inline int ed_toggle_case(int a) { return isalpha(a) ? a ^ 0x20 : -1; }
@@ -477,10 +477,11 @@ void ed_draw_statusbar(struct abuf *ab) {
   int statuslen = strlen(editor.filename);
   ab_append(ab, editor.filename, statuslen);
 
-  char buf1[20];
-  int linelen = snprintf(buf1, sizeof(buf1), "Ln%hu,Col%hu", editor.cy + 1,
-                         editor.cx + 1 - TEXT_START);
-  int margin = editor.wincols - statuslen - linelen;  //- 1;
+  char buf1[40];
+  int linelen =
+      snprintf(buf1, sizeof(buf1), "Ln%hu,Col%hu  %d lines", editor.cy + 1,
+               editor.cx + 1 - TEXT_START, editor.numrows);
+  int margin = editor.wincols + TEXT_START - statuslen - linelen;  //- 1;
   while (margin--) {
     ab_append(ab, " ", 1);
   }
@@ -491,12 +492,27 @@ void ed_draw_statusbar(struct abuf *ab) {
   ab_append(ab, "\r\n", 2);
 }
 
+void ed_set_commandmsg(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(editor.commandmsg, sizeof(editor.commandmsg), fmt, args);
+  va_end(args);
+  editor.commandmsg_time = time(NULL);
+}
+
 void ed_draw_commandbar(struct abuf *ab) {
+  // clear line
+  ab_append(ab, "\x1b[K", 3);
   char buf[20];
-  int modelen =
-      snprintf(buf, sizeof(buf), "%s",
-               editor.mode == NORMAL_MODE ? "-- NORMAL --" : "-- INSERT --");
+  int modelen = snprintf(
+      buf, sizeof(buf), "%s",
+      editor.mode == NORMAL_MODE ? "-- NORMAL --  " : "-- INSERT --  ");
   ab_append(ab, buf, modelen);
+  if (time(NULL) - editor.commandmsg_time < 5) {
+    int size = sizeof(editor.commandmsg);
+    ab_append(ab, editor.commandmsg,
+              size > WIN_MAX_LENGTH ? WIN_MAX_LENGTH : size);
+  }
 }
 
 void ed_clear() {
@@ -654,7 +670,12 @@ void init_editor() {
   editor.filename = NULL;
   editor.rownum_width = 0;
 
+  editor.commandmsg[0] = '\0';
+  editor.commandmsg_time = 0;
+
   if (get_winsize(&editor.winrows, &editor.wincols) == -1) die("get_winsize");
+
+  ed_set_commandmsg("Ctrl-q = quit");
 }
 
 int main(int argc, char const *argv[]) {

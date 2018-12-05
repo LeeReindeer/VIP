@@ -43,6 +43,7 @@ inline int println(const char *fmt, ...);
 inline void ed_draw_rows(struct abuf *ab);
 inline void ed_draw_statusbar(struct abuf *ab);
 inline void ed_draw_commandbar(struct abuf *ab);
+inline void ed_set_commandmsg(const char *fmt, ...);
 inline void ed_clear();
 inline void ed_refresh();
 inline void ed_scroll();
