@@ -70,7 +70,7 @@ enum EditorKey {
 #define CTRL_KEY(k) ((k)&0x1f)
 #define TEXT_START (editor.rownum_width + 1)
 #define TEXT_MAX_LENGTH ((int)editor.wincols - TEXT_START)
-#define CURRENT_ROW ((int)editor.cy + editor.row_offset)
+#define CURRENT_ROW ((int)editor.cy)
 #define MAX_ROW_OFFSET \
   ((editor.numrows / (int)editor.winrows) * (int)editor.winrows)
 #define MIN_ROW_OFFSET 0
@@ -244,43 +244,28 @@ void ed_process_move(int key) {
   switch (key) {
     case LEFT:
     case ARROW_LEFT:
-      if (editor.col_offset > 0 && editor.cx == TEXT_START) {
-        editor.col_offset--;
-      } else if (editor.cx != text_start) {
+      if (editor.cx != text_start) {
         editor.cx--;
       }
       editor.prev_cx = editor.cx;
       break;
     case RIGHT:
     case ARROW_RIGHT:
-      if (editor.col_offset < row->rsize - TEXT_MAX_LENGTH &&
-          editor.cx == editor.wincols - 1) {
-        editor.col_offset++;
-      } else if (editor.cx != text_end - editor.col_offset) {
+      if (editor.cx != text_end) {
         editor.cx++;
       }
       editor.prev_cx = editor.cx;
       break;
     case DOWN:
     case ARROW_DOWN:
-      if (editor.numrows != 0 && editor.numrows <= (int)editor.winrows) {
-        if (editor.cy != editor.numrows - 1) editor.cy++;
-      } else {
-        if (editor.cy != editor.winrows - 1)
-          editor.cy++;
-        else if (editor.row_offset < editor.numrows - (int)editor.winrows)
-          editor.row_offset++;
+      if (editor.cy < editor.numrows) {
+        editor.cy++;
       }
       break;
     case UP:
     case ARROW_UP:
-      if (editor.row_offset == 0) {
-        if (editor.cy != 0) editor.cy--;
-      } else {
-        if (editor.cy != 0)
-          editor.cy--;
-        else if (editor.row_offset > 0)
-          editor.row_offset--;
+      if (editor.cy != 0) {
+        editor.cy--;
       }
       break;
     default:
@@ -292,7 +277,7 @@ void ed_process_move(int key) {
   if (row) {
     // minus 1 only if row->size != 0,
     text_end = row ? TEXT_START + row->rsize : 0;
-    if (editor.col_offset > 0) text_end -= editor.col_offset;
+    // if (editor.col_offset > 0) text_end -= editor.col_offset;
     // from small line to large line, and reposition to prev
     if (editor.prev_cx < text_end) {
       editor.cx = editor.prev_cx;
@@ -335,26 +320,26 @@ void ed_normal_process(int c) {
       break;
     case LINE_END:
     case END_KEY:
-      if (editor.row[CURRENT_ROW].rsize > TEXT_MAX_LENGTH) {
-        editor.col_offset = editor.row[CURRENT_ROW].rsize - TEXT_MAX_LENGTH;
-        editor.cx = editor.numrows != 0 ? editor.wincols - 1 : 0;
-      } else {
-        editor.cx = editor.numrows != 0
-                        ? TEXT_START + editor.row[CURRENT_ROW].rsize - 1
-                        : 0;
-      }
+      editor.cx = editor.numrows != 0
+                      ? TEXT_START + editor.row[CURRENT_ROW].rsize - 1
+                      : 0;
       editor.prev_cx = editor.cx;
       break;
     case PAGE_DOWN:
-      if ((editor.row_offset += (int)editor.winrows) > editor.numrows) {
-        editor.row_offset = MAX_ROW_OFFSET;
+    case PAGE_UP: {
+      // move cursor to bottom
+      if (c == PAGE_DOWN) {
+        editor.cy = editor.row_offset + editor.winrows - 1;
+        if (editor.cy > editor.numrows) editor.cy = editor.numrows;
+      } else {
+        // move cursor to top
+        editor.cy = editor.row_offset;
       }
-      break;
-    case PAGE_UP:
-      if ((editor.row_offset -= (int)editor.winrows) < 0) {
-        editor.row_offset = MIN_ROW_OFFSET;
+      int rows = editor.winrows;
+      while (rows--) {
+        ed_process_move(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
       }
-      break;
+    } break;
     case ARROW_DOWN:
     case DOWN:
     case ARROW_UP:
@@ -410,9 +395,33 @@ static inline void ed_draw_center(struct abuf *ab, int line_size) {
   }
 }
 
+// check if the cursor has moved outside of the visible window, and if so,
+// adjust row_offset so that the cursor is just inside the visible window.
+// called before refresh the screen.
+void ed_scroll() {
+  // scroll up
+  if (editor.cy < editor.row_offset) {
+    editor.row_offset = editor.cy;
+  }
+  // max cy is winrows - 1, cy index from 0
+  // scroll down
+  if (editor.cy >= editor.row_offset + editor.winrows) {
+    editor.row_offset = editor.cy - editor.winrows + 1;
+  }
+
+  // scroll left
+  // min cx is TEXT_START
+  if (editor.cx - TEXT_START < editor.col_offset) {
+    editor.col_offset = editor.cx - TEXT_START;
+  }
+  // scroll right
+  if (editor.cx >= editor.col_offset + editor.wincols) {
+    editor.col_offset = editor.cx - editor.wincols + 1;
+  }
+}
+
 void ed_draw_rows(struct abuf *ab) {
   int y;
-  // char line_num[10] = {'\0'};
   for (y = 0; y < editor.winrows; y++) {
     int filerow = y + editor.row_offset;
     if (filerow >= editor.numrows) {
@@ -445,7 +454,7 @@ void ed_draw_rows(struct abuf *ab) {
       int len = editor.row[filerow].rsize - editor.col_offset;
       // int len = editor.row[filerow].rsize;
       if (len < 0) len = 0;
-      if (len > TEXT_MAX_LENGTH) len = TEXT_MAX_LENGTH;
+      if (len > editor.wincols) len = editor.wincols;
       ab_append(ab, editor.row[filerow].render + editor.col_offset, len);
       // ab_append(ab, editor.row[filerow].render, len);
     }
@@ -497,13 +506,12 @@ void ed_clear() {
   write(STDOUT_FILENO, "\x1b[H", 3);
 }
 
+// refresh(clear and repaint) screen after every key press,
+// render text, draw bar and do many other stuffs.
+// called in main loop
 void ed_refresh() {
-  // if (editor.cx < editor.col_offset) {
-  //   editor.col_offset = editor.cx;
-  // }
-  // if (editor.cx >= editor.col_offset * TEXT_MAX_LENGTH) {
-  //   editor.col_offset = editor.cx - TEXT_MAX_LENGTH + 1;
-  // }
+  ed_scroll();
+
   struct abuf ab = ABUF_INIT;
   // hide cursor
   ab_append(&ab, "\x1b[?25l", 6);
@@ -517,7 +525,8 @@ void ed_refresh() {
   ed_draw_commandbar(&ab);
 
   // move the cursor
-  ed_move_cursor2(&ab, editor.cx, editor.cy);
+  ed_move_cursor2(&ab, editor.cx - editor.col_offset,
+                  editor.cy - editor.row_offset);
 
   // show cursor
   ab_append(&ab, "\x1b[?25h", 6);
@@ -595,8 +604,7 @@ void ed_row_insert(TextRow *row, int pos, int c) {
 
 void ed_insert_char(int c) {
   // insert before cursor, just like vim
-  ed_row_insert(&editor.row[CURRENT_ROW],
-                editor.cx - TEXT_START + editor.col_offset, c);
+  ed_row_insert(&editor.row[CURRENT_ROW], editor.cx - TEXT_START, c);
   editor.cx++;
 }
 
@@ -647,9 +655,6 @@ void init_editor() {
   editor.rownum_width = 0;
 
   if (get_winsize(&editor.winrows, &editor.wincols) == -1) die("get_winsize");
-
-  // last 2 row draw as status bar
-  editor.winrows -= 2;
 }
 
 int main(int argc, char const *argv[]) {
@@ -662,6 +667,11 @@ int main(int argc, char const *argv[]) {
   } else {
     // todo show help
   }
+
+  // last 2 row draw as status bar
+  editor.winrows -= 2;
+  // first some cols display as line number
+  editor.wincols -= TEXT_START;
 
   while (1) {
     ed_refresh();

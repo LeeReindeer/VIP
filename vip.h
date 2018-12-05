@@ -45,6 +45,7 @@ inline void ed_draw_statusbar(struct abuf *ab);
 inline void ed_draw_commandbar(struct abuf *ab);
 inline void ed_clear();
 inline void ed_refresh();
+inline void ed_scroll();
 
 /* row ops */
 inline void ed_render_row(TextRow *row);
