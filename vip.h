@@ -54,13 +54,15 @@ inline void ed_scroll();
 inline void ed_render_row(TextRow *row);
 inline void ed_appand_row(char *s, size_t len);
 inline void ed_row_insert(TextRow *row, int pos, int c);
+inline void ed_row_delete(TextRow *row, int pos);
 
 /* edit ops */
 inline void ed_insert_char(int c);
+inline void ed_delete_char(int pos);
 
 /* file I/O */
 void ed_open(const char *filename);
-void ed_rows2str(int *buflem);
+char *ed_rows2str(int *buflen);
 void ed_save();
 
 /* init */

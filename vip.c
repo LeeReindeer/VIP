@@ -1,6 +1,7 @@
 #include "vip.h"
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,11 +50,11 @@ enum EditorKey {
   ARROW_DOWN = 1003,
 
   HOME_KEY = 2001,
+  INS_KEY = 2002,
   DEL_KEY = 2003,
   END_KEY = 2004,
   PAGE_DOWN = 2005,
   PAGE_UP = 2006,
-  INS_KEY = 2007,
 
   // real map key
   BACKSPACE = 127,
@@ -249,6 +250,7 @@ void ed_process_move(int key) {
       }
       editor.prev_cx = editor.cx;
       break;
+    case ENTER:
     case DOWN:
     case ARROW_DOWN:
       if (editor.cy < editor.numrows) {
@@ -260,6 +262,18 @@ void ed_process_move(int key) {
       if (editor.cy != 0) {
         editor.cy--;
       }
+      break;
+    case BACKSPACE:
+    // 8 same as BACKSPACE
+    case CTRL_KEY('h'):
+      // same as ARROW_LEFT
+      if (editor.cx != text_start) {
+        editor.cx--;
+      } else if (editor.cy != 0) {
+        editor.cy--;
+        editor.cx = editor.row[CURRENT_ROW].rsize + TEXT_START;
+      }
+      editor.prev_cx = editor.cx;
       break;
     default:
       break;
@@ -285,15 +299,13 @@ void ed_normal_process(int c) {
     case NORMAL_MODE_KEY:
     case CTRL_KEY('l'):
       break;
-    case ENTER:
-      break;
-    case BACKSPACE:
-    // 8 same as BACKSPACE
-    case CTRL_KEY('h'):
-      // todo
+      // todo use :w to save
+    case CTRL_KEY('s'):
+      ed_save();
       break;
     case DEL_KEY:
-      // todo
+      ed_delete_char(editor.cx);
+      ed_process_move(ARROW_RIGHT);
       break;
     case INS_KEY:
     case INSERT_MODE_KEY:
@@ -335,6 +347,10 @@ void ed_normal_process(int c) {
         ed_process_move(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
       }
     } break;
+    case ENTER:
+    case BACKSPACE:
+    // 8 same as BACKSPACE
+    case CTRL_KEY('h'):
     case ARROW_DOWN:
     case DOWN:
     case ARROW_UP:
@@ -360,6 +376,17 @@ void ed_insert_process(int c) {
     case ARROW_LEFT:
     case ARROW_RIGHT:
       ed_process_move(c);
+      break;
+    case ENTER:
+      break;
+    case BACKSPACE:
+    case CTRL_KEY('h'):
+      ed_delete_char(editor.cx - 1);
+      ed_process_move(ARROW_RIGHT);
+      break;
+    case DEL_KEY:
+      ed_delete_char(editor.cx);
+      ed_process_move(ARROW_RIGHT);
       break;
     default:
       ed_insert_char(c);
@@ -498,6 +525,7 @@ void ed_draw_statusbar(struct abuf *ab) {
 void ed_set_commandmsg(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
+  memset(editor.commandmsg, 0, sizeof(editor.commandmsg));
   vsnprintf(editor.commandmsg, sizeof(editor.commandmsg), fmt, args);
   va_end(args);
   editor.commandmsg_time = time(NULL);
@@ -624,12 +652,30 @@ void ed_row_insert(TextRow *row, int pos, int c) {
   ed_render_row(row);
 }
 
-/* edit ops, called from ed_progress_keyprogress() */
+void ed_row_delete(TextRow *row, int pos) {
+  if (pos < 0 || pos >= row->size) return;
+  // move a byte backwards
+  memmove(&row->string[pos], &row->string[pos + 1], row->size - pos);
+  // decrease size
+  row->size--;
+  ed_render_row(row);
+}
 
+/* edit ops, called from ed_progress_keyprogress() */
 void ed_insert_char(int c) {
   // insert before cursor, just like vim
   ed_row_insert(&editor.row[CURRENT_ROW], editor.cx - TEXT_START, c);
   editor.cx++;
+}
+
+void ed_delete_char(int pos) {
+  if (editor.cy == editor.numrows) return;
+  TextRow *row = &editor.row[CURRENT_ROW];
+  if (editor.cx > 0) {
+    // delete char on the cursor
+    ed_row_delete(row, pos - TEXT_START);
+    editor.cx--;
+  }
 }
 
 /* file I/O */
@@ -665,6 +711,47 @@ void ed_open(const char *filename) {
   editor.file_opened = 1;
 }
 
+char *ed_rows2str(int *buflen) {
+  int totallen = 0;
+  for (int i = 0; i < editor.numrows; i++) {
+    totallen += editor.row[i].size + 1;
+  }
+  *buflen = totallen;
+
+  char *buf = malloc(totallen);
+  char *p = buf;
+
+  for (int i = 0; i < editor.numrows; i++) {
+    memcpy(p, editor.row[i].string, editor.row[i].size);
+    p += editor.row[i].size;
+    // append \n
+    *p = '\n';
+  }
+  return buf;
+}
+
+void ed_save() {
+  if (!editor.file_opened) return;
+
+  int len;
+  char *buf = ed_rows2str(&len);
+
+  int fd = open(editor.filename, O_RDWR | O_CREAT, 0644);
+  // set file size
+  if (fd != -1) {
+    if (ftruncate(fd, len) != -1) {
+      if (write(fd, buf, len) == len) {
+        close(fd);
+        free(buf);
+        ed_set_commandmsg("%dL, %dC written", editor.numrows, len);
+        return;
+      }
+    }
+    close(fd);
+  }
+  free(buf);
+  ed_set_commandmsg("can't save! I/O error: %s", strerror(errno));
+}
 /* init */
 
 void init_editor() {
