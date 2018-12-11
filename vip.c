@@ -77,6 +77,9 @@ enum EditorKey {
   LINE_START = '0',
   LINE_END = '$',
 
+  NEWLINE_BEFORE_KEY = 'O',
+  NEWLINE_AFTER_KEY = 'o',
+
   INSERT_MODE_KEY = 'i',
   NORMAL_MODE_KEY = '\x1b'
 };
@@ -90,6 +93,7 @@ enum EditorKey {
 #define CURRENT_ROW ((int)editor.cy)
 #define TAB_SIZE 8  // todo set in setting file .viprc
 #define NEWLINE_AFTER 1
+#define NEWLINE_INSERT 1
 #define NEWLINE_BEFORE 0
 static Editor editor;
 
@@ -362,6 +366,12 @@ void ed_normal_process(int c) {
         ed_process_move(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
       }
     } break;
+    case NEWLINE_AFTER_KEY:
+      ed_insert_newline(NEWLINE_AFTER);
+      break;
+    case NEWLINE_BEFORE_KEY:
+      ed_insert_newline(NEWLINE_BEFORE);
+      break;
     case ENTER:
     case BACKSPACE:
     // 8 same as BACKSPACE
@@ -393,12 +403,11 @@ void ed_insert_process(int c) {
       ed_process_move(c);
       break;
     case ENTER:
-      ed_insert_newline();
+      ed_insert_newline(NEWLINE_INSERT);
       break;
     case BACKSPACE:
     case CTRL_KEY('h'):
       ed_delete_char(CURRENT_COL - 1);
-      ed_process_move(ARROW_RIGHT);
       break;
     case DEL_KEY:
       ed_delete_char(CURRENT_COL);
@@ -677,9 +686,53 @@ void ed_row_insert_char(TextRow *row, int pos, int c) {
   ed_render_row(row);
 }
 
+static inline void newline_before() { ed_insert_row(CURRENT_ROW, "", 0); }
+
+static inline void newline_after() {
+  TextRow *row = &editor.row[CURRENT_ROW];
+  ed_insert_row(editor.cy + 1, &row->string[CURRENT_COL],
+                row->size - CURRENT_COL);
+
+  // reget current row
+  row = &editor.row[CURRENT_ROW];
+  row->size = CURRENT_COL;
+  // cut strings after CURRENT_COL
+  row->string[row->size] = '\0';
+  ed_render_row(row);
+}
+
+static inline void newline_insert_mode() {
+  if (editor.cx == TEXT_START) {
+    // new line before current
+    newline_before();
+  } else {
+    newline_after();
+  }
+  editor.cy++;
+  editor.cx = TEXT_START;
+}
+
+static inline void newline_noraml_mode(int after) {
+  if (after) {
+    ed_insert_row(CURRENT_ROW + 1, "", 0);
+    editor.cy++;
+  } else {
+    newline_before();
+  }
+  editor.cx = TEXT_START;
+  // change mode to INSERT
+  editor.mode = INSERT_MODE;
+}
+
 // called when <ENTER> press in INSERT mode,
 // or <o>, <O> pressed in NORMAL mode
-void ed_insert_newline() {}
+void ed_insert_newline(int after) {
+  if (editor.mode == NORMAL_MODE) {
+    newline_noraml_mode(after);
+  } else if (editor.mode == INSERT_MODE) {
+    newline_insert_mode();
+  }
+}
 
 void ed_row_delete_char(TextRow *row, int pos) {
   if (pos < 0 || pos >= row->size) return;

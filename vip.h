@@ -60,7 +60,7 @@ inline void ed_row_delete_char(TextRow *row, int pos);
 
 /* edit ops */
 inline void ed_insert_char(int c);
-inline void ed_insert_newline();
+inline void ed_insert_newline(int after);
 inline void ed_delete_char(int pos);
 
 /* file I/O */
