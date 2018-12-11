@@ -13,6 +13,16 @@
 
 enum EditorMode { NORMAL_MODE = 0, INSERT_MODE };
 
+struct motion {
+  int n;  // default is 1, means do motion once. But for some motion(gg) is 0
+  char motion[3];  // examples: h,j,k,l,G,gg,x,dd,yy
+};
+
+struct op_motion {
+  char op;          // support operators: c,d,y;
+  struct motion m;  // support motion: w, e, $, 0
+};
+
 struct text_row {
   int size;
   int rsize;  // render size
@@ -75,8 +85,12 @@ enum EditorKey {
 #define CTRL_KEY(k) ((k)&0x1f)
 #define TEXT_START (editor.rownum_width + 1)
 #define WIN_MAX_LENGTH ((int)editor.wincols + TEXT_START)
+// row and col for text
+#define CURRENT_COL ((int)editor.cx - TEXT_START)
 #define CURRENT_ROW ((int)editor.cy)
 #define TAB_SIZE 8  // todo set in setting file .viprc
+#define NEWLINE_AFTER 1
+#define NEWLINE_BEFORE 0
 static Editor editor;
 
 /* terminal*/
@@ -84,6 +98,7 @@ static Editor editor;
 void die(const char *msg) {
   ed_clear();
   perror(msg);
+  println("");
   exit(1);
 }
 
@@ -304,7 +319,7 @@ void ed_normal_process(int c) {
       ed_save();
       break;
     case DEL_KEY:
-      ed_delete_char(editor.cx);
+      ed_delete_char(CURRENT_COL);
       ed_process_move(ARROW_RIGHT);
       break;
     case INS_KEY:
@@ -378,14 +393,15 @@ void ed_insert_process(int c) {
       ed_process_move(c);
       break;
     case ENTER:
+      ed_insert_newline();
       break;
     case BACKSPACE:
     case CTRL_KEY('h'):
-      ed_delete_char(editor.cx - 1);
+      ed_delete_char(CURRENT_COL - 1);
       ed_process_move(ARROW_RIGHT);
       break;
     case DEL_KEY:
-      ed_delete_char(editor.cx);
+      ed_delete_char(CURRENT_COL);
       ed_process_move(ARROW_RIGHT);
       break;
     default:
@@ -626,19 +642,24 @@ void ed_render_row(TextRow *row) {
   row->rsize = cnt;
 }
 
-void ed_appand_row(char *s, size_t len) {
+// insert a new row, just like ed_row_insert
+void ed_insert_row(int rpos, char *s, size_t len) {
+  if (rpos < 0 || rpos > editor.numrows) return;
+
   editor.row = realloc(editor.row, sizeof(TextRow) * (editor.numrows + 1));
+  memmove(&editor.row[rpos + 1], &editor.row[rpos],
+          sizeof(TextRow) * (editor.numrows - rpos));
 
-  int this = editor.numrows;
-  editor.row[this].size = len;
-  editor.row[this].string = malloc(len + 1);
-  memcpy(editor.row[this].string, s, len);
-  editor.row[this].string[len] = '\0';
+  editor.row[rpos].size = len;
+  editor.row[rpos].string = malloc(len + 1);
+  memcpy(editor.row[rpos].string, s, len);
+  editor.row[rpos].string[len] = '\0';
 
-  editor.row[this].rsize = 0;
-  editor.row[this].render = NULL;
-  ed_render_row(&editor.row[this]);
+  editor.row[rpos].rsize = 0;
+  editor.row[rpos].render = NULL;
+  ed_render_row(&editor.row[rpos]);
 
+  int n = editor.numrows;
   editor.numrows++;
 }
 
@@ -652,6 +673,12 @@ void ed_row_insert(TextRow *row, int pos, int c) {
   ed_render_row(row);
 }
 
+// called when <ENTER> press in INSERT mode,
+// or <o>, <O> pressed in NORMAL mode
+void ed_insert_newline() {
+  // todo
+}
+
 void ed_row_delete(TextRow *row, int pos) {
   if (pos < 0 || pos >= row->size) return;
   // move a byte backwards
@@ -663,8 +690,12 @@ void ed_row_delete(TextRow *row, int pos) {
 
 /* edit ops, called from ed_progress_keyprogress() */
 void ed_insert_char(int c) {
+  // open or create empty file, create a new line
+  if (editor.numrows == editor.cy) {
+    // todo
+  }
   // insert before cursor, just like vim
-  ed_row_insert(&editor.row[CURRENT_ROW], editor.cx - TEXT_START, c);
+  ed_row_insert(&editor.row[CURRENT_ROW], CURRENT_COL, c);
   editor.cx++;
 }
 
@@ -673,7 +704,7 @@ void ed_delete_char(int pos) {
   TextRow *row = &editor.row[CURRENT_ROW];
   if (editor.cx > 0) {
     // delete char on the cursor
-    ed_row_delete(row, pos - TEXT_START);
+    ed_row_delete(row, pos);
     editor.cx--;
   }
 }
@@ -696,7 +727,7 @@ void ed_open(const char *filename) {
     while (linelen > 0 &&
            (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
       linelen--;
-    ed_appand_row(line, linelen);
+    ed_insert_row(editor.numrows, line, linelen);
   }
 
   char numbuf[10];
@@ -711,6 +742,7 @@ void ed_open(const char *filename) {
   editor.file_opened = 1;
 }
 
+// todo bugs when insert newline
 char *ed_rows2str(int *buflen) {
   int totallen = 0;
   for (int i = 0; i < editor.numrows; i++) {
