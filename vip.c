@@ -647,9 +647,13 @@ void ed_insert_row(int rpos, char *s, size_t len) {
   if (rpos < 0 || rpos > editor.numrows) return;
 
   editor.row = realloc(editor.row, sizeof(TextRow) * (editor.numrows + 1));
+  // move all rows below rpos(included)
+  // down one row that makes room for new row
+  // if rpos equals numrows, it does nothing
   memmove(&editor.row[rpos + 1], &editor.row[rpos],
           sizeof(TextRow) * (editor.numrows - rpos));
 
+  // new row
   editor.row[rpos].size = len;
   editor.row[rpos].string = malloc(len + 1);
   memcpy(editor.row[rpos].string, s, len);
@@ -664,7 +668,7 @@ void ed_insert_row(int rpos, char *s, size_t len) {
 }
 
 // insert c into pos
-void ed_row_insert(TextRow *row, int pos, int c) {
+void ed_row_insert_char(TextRow *row, int pos, int c) {
   if (pos < 0 || pos > row->size) pos = row->size;
   row->string = realloc(row->string, row->size + 2);
   memmove(&row->string[pos + 1], &row->string[pos], row->size - pos + 1);
@@ -679,7 +683,7 @@ void ed_insert_newline() {
   // todo
 }
 
-void ed_row_delete(TextRow *row, int pos) {
+void ed_row_delete_char(TextRow *row, int pos) {
   if (pos < 0 || pos >= row->size) return;
   // move a byte backwards
   memmove(&row->string[pos], &row->string[pos + 1], row->size - pos);
@@ -692,10 +696,10 @@ void ed_row_delete(TextRow *row, int pos) {
 void ed_insert_char(int c) {
   // open or create empty file, create a new line
   if (editor.numrows == editor.cy) {
-    // todo
+    ed_insert_row(editor.numrows, "", 0);
   }
   // insert before cursor, just like vim
-  ed_row_insert(&editor.row[CURRENT_ROW], CURRENT_COL, c);
+  ed_row_insert_char(&editor.row[CURRENT_ROW], CURRENT_COL, c);
   editor.cx++;
 }
 
@@ -704,7 +708,7 @@ void ed_delete_char(int pos) {
   TextRow *row = &editor.row[CURRENT_ROW];
   if (editor.cx > 0) {
     // delete char on the cursor
-    ed_row_delete(row, pos);
+    ed_row_delete_char(row, pos);
     editor.cx--;
   }
 }
@@ -758,6 +762,8 @@ char *ed_rows2str(int *buflen) {
     p += editor.row[i].size;
     // append \n
     *p = '\n';
+    // move after to \n, just a new line
+    p++;
   }
   return buf;
 }

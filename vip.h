@@ -55,8 +55,8 @@ inline void ed_scroll();
 /* row ops */
 inline void ed_render_row(TextRow *row);
 inline void ed_insert_row(int row_pos, char *s, size_t len);
-inline void ed_row_insert(TextRow *row, int pos, int c);
-inline void ed_row_delete(TextRow *row, int pos);
+inline void ed_row_insert_char(TextRow *row, int pos, int c);
+inline void ed_row_delete_char(TextRow *row, int pos);
 
 /* edit ops */
 inline void ed_insert_char(int c);
