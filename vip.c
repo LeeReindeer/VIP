@@ -840,7 +840,7 @@ void to_insert_mode() { editor.mode = INSERT_MODE; }
 /* file I/O */
 
 void ed_open(const char *filename) {
-  FILE *fp = fopen(filename, "r");
+  FILE *fp = fopen(filename, "ab+");
   if (!fp) die("fopen");
 
   free(editor.filename);
