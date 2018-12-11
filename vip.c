@@ -91,6 +91,8 @@ enum EditorKey {
 // row and col for text
 #define CURRENT_COL ((int)editor.cx - TEXT_START)
 #define CURRENT_ROW ((int)editor.cy)
+#define MAX_CX(ROW) ((ROW).rsize + TEXT_START - 1)
+#define MIN_CX TEXT_START
 #define TAB_SIZE 8  // todo set in setting file .viprc
 #define NEWLINE_AFTER 1
 #define NEWLINE_INSERT 1
@@ -323,14 +325,13 @@ void ed_normal_process(int c) {
       ed_save();
       break;
     case DEL_KEY:
-      ed_delete_char(CURRENT_COL);
-      ed_process_move(ARROW_RIGHT);
+      ed_row_delete_char(&editor.row[CURRENT_ROW], CURRENT_COL);
       break;
     case INS_KEY:
     case INSERT_MODE_KEY:
       // nothing in welcome screen
       if (!editor.file_opened) return;
-      editor.mode = INSERT_MODE;
+      to_insert_mode();
       break;
     case CTRL_KEY('q'):
       ed_clear();
@@ -394,7 +395,7 @@ void ed_normal_process(int c) {
 void ed_insert_process(int c) {
   switch (c) {
     case NORMAL_MODE_KEY:
-      editor.mode = NORMAL_MODE;
+      to_normal_mode();
       break;
     case ARROW_DOWN:
     case ARROW_UP:
@@ -407,11 +408,10 @@ void ed_insert_process(int c) {
       break;
     case BACKSPACE:
     case CTRL_KEY('h'):
-      ed_delete_char(CURRENT_COL - 1);
+      ed_delete_char_row(CURRENT_COL - 1);
       break;
     case DEL_KEY:
-      ed_delete_char(CURRENT_COL);
-      ed_process_move(ARROW_RIGHT);
+      ed_row_delete_char(&editor.row[CURRENT_ROW], CURRENT_COL);
       break;
     default:
       ed_insert_char(c);
@@ -720,7 +720,7 @@ static inline void newline_noraml_mode(int after) {
   }
   editor.cx = TEXT_START;
   // change mode to INSERT
-  editor.mode = INSERT_MODE;
+  to_insert_mode();
 }
 
 // called when <ENTER> press in INSERT mode,
@@ -780,7 +780,8 @@ void ed_insert_char(int c) {
   editor.cx++;
 }
 
-void ed_delete_char(int pos) {
+// delete char or row
+void ed_delete_char_row(int pos) {
   if (editor.cy >= editor.numrows) return;
   // empty
   if (editor.cx == TEXT_START && editor.cy == 0) return;
@@ -792,12 +793,24 @@ void ed_delete_char(int pos) {
     editor.cx--;
   } else {
     // delete this row, join its string to previous line
+    // editor.cx = MAX_CX(editor.row[CURRENT_ROW - 1]) + 1;
     editor.cx = editor.row[CURRENT_ROW - 1].size + TEXT_START;
     ed_joinstr2row(&editor.row[CURRENT_ROW - 1], row->string, row->size);
     ed_delete_row(CURRENT_ROW);
     editor.cy--;
   }
 }
+
+/* mode */
+
+void to_normal_mode() {
+  int max_size = MAX_CX(editor.row[CURRENT_ROW]);
+  // snap cursor at the last char
+  if (editor.cx > max_size) editor.cx = max_size;
+  editor.mode = NORMAL_MODE;
+}
+
+void to_insert_mode() { editor.mode = INSERT_MODE; }
 
 /* file I/O */
 

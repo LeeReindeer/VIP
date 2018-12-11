@@ -64,7 +64,11 @@ inline void ed_row_delete_char(TextRow *row, int pos);
 /* edit ops */
 inline void ed_insert_char(int c);
 inline void ed_insert_newline(int after);
-inline void ed_delete_char(int pos);
+inline void ed_delete_char_row(int pos);
+
+/* mode */
+inline void to_normal_mode();
+inline void to_insert_mode();
 
 /* file I/O */
 void ed_open(const char *filename);
