@@ -813,6 +813,13 @@ void init_editor() {
   ed_set_commandmsg("type <CTRL-Q> to quit");
 }
 
+static inline void init_rowcol() {
+  // last 2 row draw as status bar
+  editor.winrows -= 2;
+  // first some cols display as line number
+  editor.wincols -= TEXT_START;
+}
+
 int main(int argc, char const *argv[]) {
   init_editor();
 
@@ -821,13 +828,12 @@ int main(int argc, char const *argv[]) {
   } else if (argc == 2) {
     ed_open(argv[1]);
   } else {
-    // todo show help
+    println("Usage: %s <filename>", argv[0]);
+    exit(0);
   }
 
-  // last 2 row draw as status bar
-  editor.winrows -= 2;
-  // first some cols display as line number
-  editor.wincols -= TEXT_START;
+  init_rowcol();
+
   while (1) {
     ed_refresh();
     ed_process_keypress();
