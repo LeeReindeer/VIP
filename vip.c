@@ -331,6 +331,7 @@ void ed_normal_process(int c) {
       break;
     case DEL_KEY:
       ed_row_delete_char(&editor.row[CURRENT_ROW], CURRENT_COL);
+      ed_process_move(ARROW_LEFT);
       break;
     case INS_KEY:
     case INSERT_MODE_KEY:
@@ -432,6 +433,7 @@ void ed_insert_process(int c) {
       break;
     case DEL_KEY:
       ed_row_delete_char(&editor.row[CURRENT_ROW], CURRENT_COL);
+      ed_process_move(ARROW_LEFT);
       break;
     default:
       ed_insert_char(c);
