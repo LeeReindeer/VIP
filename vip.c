@@ -33,7 +33,7 @@ struct text_row {
 typedef struct editor_config {
   struct termios origin_termios;
   win_size_t cx, cy;  // cursor position
-  // todo
+  // todo render tab
   win_size_t rx;       // index for render tab
   win_size_t prev_cx;  // previous cursor's x coordinate
   int row_offset;
@@ -679,9 +679,7 @@ void ed_row_insert_char(TextRow *row, int pos, int c) {
 
 // called when <ENTER> press in INSERT mode,
 // or <o>, <O> pressed in NORMAL mode
-void ed_insert_newline() {
-  // todo
-}
+void ed_insert_newline() {}
 
 void ed_row_delete_char(TextRow *row, int pos) {
   if (pos < 0 || pos >= row->size) return;
@@ -746,7 +744,6 @@ void ed_open(const char *filename) {
   editor.file_opened = 1;
 }
 
-// todo bugs when insert newline
 char *ed_rows2str(int *buflen) {
   int totallen = 0;
   for (int i = 0; i < editor.numrows; i++) {
