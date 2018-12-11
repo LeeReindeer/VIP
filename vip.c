@@ -80,6 +80,11 @@ enum EditorKey {
   NEWLINE_BEFORE_KEY = 'O',
   NEWLINE_AFTER_KEY = 'o',
 
+  APPAND_CHAR_KEY = 'a',
+  APPAND_LINE_KEY = 'A',
+
+  JOIN_LINE_KEY = 'J',
+
   INSERT_MODE_KEY = 'i',
   NORMAL_MODE_KEY = '\x1b'
 };
@@ -373,6 +378,21 @@ void ed_normal_process(int c) {
     case NEWLINE_BEFORE_KEY:
       ed_insert_newline(NEWLINE_BEFORE);
       break;
+    case APPAND_CHAR_KEY:
+      to_insert_mode();
+      editor.cx++;
+      break;
+    case APPAND_LINE_KEY:
+      to_insert_mode();
+      editor.cx = MAX_CX(editor.row[CURRENT_ROW]) + 1;
+      break;
+    case JOIN_LINE_KEY: {
+      if (CURRENT_ROW >= editor.numrows - 1) return;
+      TextRow *next_row = &editor.row[CURRENT_ROW + 1];
+      ed_joinstr2row(&editor.row[CURRENT_ROW], next_row->string,
+                     next_row->size);
+      ed_delete_row(CURRENT_ROW + 1);
+    } break;
     case ENTER:
     case BACKSPACE:
     // 8 same as BACKSPACE
