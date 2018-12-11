@@ -672,7 +672,6 @@ void ed_insert_row(int rpos, char *s, size_t len) {
   editor.row[rpos].render = NULL;
   ed_render_row(&editor.row[rpos]);
 
-  int n = editor.numrows;
   editor.numrows++;
 }
 
@@ -743,7 +742,34 @@ void ed_row_delete_char(TextRow *row, int pos) {
   ed_render_row(row);
 }
 
+void ed_free_row(TextRow *row) {
+  free(row->render);
+  free(row->string);
+}
+
+// join string s to row
+void ed_joinstr2row(TextRow *row, char *s, size_t len) {
+  row->string = realloc(row->string, row->size + len + 1);
+  memcpy(&row->string[row->size], s, len);
+  row->size += len;
+  row->string[row->size] = '\0';
+  ed_render_row(row);
+}
+
+// delete a row at rpos
+// called from backspacing at the start of a line and
+// dd operation
+void ed_delete_row(int rpos) {
+  if (rpos < 0 || rpos >= editor.numrows) return;
+  ed_free_row(&editor.row[rpos]);
+  // move up
+  memmove(&editor.row[rpos], &editor.row[rpos + 1],
+          sizeof(TextRow) * (editor.numrows - rpos - 1));
+  editor.numrows--;
+}
+
 /* edit ops, called from ed_progress_keyprogress() */
+
 void ed_insert_char(int c) {
   // open or create empty file, create a new line
   if (editor.numrows == editor.cy) {
@@ -755,12 +781,21 @@ void ed_insert_char(int c) {
 }
 
 void ed_delete_char(int pos) {
-  if (editor.cy == editor.numrows) return;
+  if (editor.cy >= editor.numrows) return;
+  // empty
+  if (editor.cx == TEXT_START && editor.cy == 0) return;
+
   TextRow *row = &editor.row[CURRENT_ROW];
-  if (editor.cx > 0) {
+  if (editor.cx > TEXT_START) {
     // delete char on the cursor
     ed_row_delete_char(row, pos);
     editor.cx--;
+  } else {
+    // delete this row, join its string to previous line
+    editor.cx = editor.row[CURRENT_ROW - 1].size + TEXT_START;
+    ed_joinstr2row(&editor.row[CURRENT_ROW - 1], row->string, row->size);
+    ed_delete_row(CURRENT_ROW);
+    editor.cy--;
   }
 }
 
