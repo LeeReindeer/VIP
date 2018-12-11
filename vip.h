@@ -1,23 +1,28 @@
 #ifndef __VIP_H__
 #define __VIP_H__
 
+#include <stddef.h>
+
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
 
 #define VIP_VERSION "0.0.1"
-// remain last 5 bits
-#define CTRL_KEY(k) ((k)&0x1f)
 typedef unsigned short win_size_t;
+typedef struct text_row TextRow;
+typedef struct motion Motion;
+typedef struct op_motion OperatorMotion;
 
 /* append buffer */
+#define DEFAULT_CAP 80
 struct abuf {
   char *b;
+  int cap;
   int len;
 };
 
 #define ABUF_INIT \
-  { NULL, 0 }
+  { NULL, DEFAULT_CAP, 0 }
 
 void ab_append(struct abuf *ab, const char *s, int len);
 void ab_free(struct abuf *ab);
@@ -32,24 +37,43 @@ int get_winsize(win_size_t *rows, win_size_t *cols);
 int get_cursor_pos(win_size_t *rows, win_size_t *cols);
 
 /* input */
-inline void ed_progress_move(int key);
-inline void ed_normal_progress(int key);
-inline void ed_insert_progress(int key);
-inline void ed_progress_keypress();
+inline void ed_process_move(int key);
+inline void ed_normal_process(int key);
+inline void ed_insert_process(int key);
+inline void ed_process_keypress();
 
 /* output */
 inline int println(const char *fmt, ...);
 inline void ed_draw_rows(struct abuf *ab);
 inline void ed_draw_statusbar(struct abuf *ab);
 inline void ed_draw_commandbar(struct abuf *ab);
+inline void ed_set_commandmsg(const char *fmt, ...);
 inline void ed_clear();
 inline void ed_refresh();
+inline void ed_scroll();
 
 /* row ops */
-// inline void ed_appand_row(char *s, size_t len);
+inline void ed_render_row(TextRow *row);
+inline void ed_insert_row(int row_pos, char *s, size_t len);
+inline void ed_delete_row(int row_pos);
+inline void ed_free_row();
+inline void ed_joinstr2row(TextRow *row, char *s, size_t len);
+inline void ed_row_insert_char(TextRow *row, int pos, int c);
+inline void ed_row_delete_char(TextRow *row, int pos);
+
+/* edit ops */
+inline void ed_insert_char(int c);
+inline void ed_insert_newline(int after);
+inline void ed_delete_char_row(int pos);
+
+/* mode */
+inline void to_normal_mode();
+inline void to_insert_mode();
 
 /* file I/O */
 void ed_open(const char *filename);
+char *ed_rows2str(int *buflen);
+void ed_save();
 
 /* init */
 inline void init_editor();
