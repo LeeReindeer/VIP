@@ -13,6 +13,10 @@ typedef struct text_row TextRow;
 typedef struct motion Motion;
 typedef struct op_motion OperatorMotion;
 
+/* vi ops */
+// only for NORMAL mode
+inline void ed_process_motions(OperatorMotion *opm);
+
 /* append buffer */
 #define DEFAULT_CAP 80
 struct abuf {
@@ -31,7 +35,7 @@ void ab_free(struct abuf *ab);
 void die(const char *msg);
 void disable_raw_mode();
 void disable_raw_mode();
-inline int ed_read_key();
+inline int ed_read_key(OperatorMotion *opm);
 inline void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y);
 int get_winsize(win_size_t *rows, win_size_t *cols);
 int get_cursor_pos(win_size_t *rows, win_size_t *cols);

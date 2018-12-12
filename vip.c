@@ -142,7 +142,10 @@ void enable_raw_mode() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
-int ed_read_key() {
+// return the key read
+// assume opm is not alloced, it will realloc in this funcation,
+// if it does't read any of supported OperatorMotion, opm should set to NULL.
+int ed_read_key(OperatorMotion *opm) {
   int nread;
   char c;
   // read 1 byte and return;
@@ -250,6 +253,12 @@ void ed_move_cursor2(struct abuf *ab, win_size_t x, win_size_t y) {
   char buf[32];
   snprintf(buf, sizeof(buf), "\x1b[%hu;%huH", y + 1, x + 1);
   ab_append(ab, buf, strlen(buf));
+}
+
+/* vi ops */
+// only for NORMAL mode
+void ed_process_motions(OperatorMotion *opm) {
+  // todo
 }
 
 /* input */
@@ -445,11 +454,16 @@ void ed_insert_process(int c) {
 }
 
 void ed_process_keypress() {
-  int key = ed_read_key();
+  // todo read vi ops
+  OperatorMotion *opm = NULL;
+  int key = ed_read_key(opm);
   if (editor.mode == INSERT_MODE) {
     ed_insert_process(key);
   } else if (editor.mode == NORMAL_MODE) {
-    ed_normal_process(key);
+    if (opm)
+      ed_process_motions(opm);
+    else
+      ed_normal_process(key);
   }
 }
 
